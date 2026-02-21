@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Amiri+Quran&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  /* Colors — Warm cream base + sage green accent (Quraneyah) + Claude cleanliness */
+  --color-cream-50: #FDFBF7;
+  --color-cream-100: #F9F5EE;
+  --color-cream-200: #F2EBE0;
+  --color-cream-300: #E8DDD0;
+  --color-cream-400: #D4C9B8;
+
+  --color-sage-50: #F2F5F2;
+  --color-sage-100: #E0EAE1;
+  --color-sage-200: #C2D5C4;
+  --color-sage-300: #9BBD9E;
+  --color-sage-400: #7AA37E;
+  --color-sage-500: #5C8B61;  /* Primary */
+  --color-sage-600: #4A7450;
+  --color-sage-700: #3A5C3E;
+  --color-sage-800: #2C4530;
+  --color-sage-900: #1E2E21;
+
+  --color-warm-50: #FAFAF9;
+  --color-warm-100: #F5F4F2;
+  --color-warm-200: #E8E6E1;
+  --color-warm-300: #D4D0C8;
+  --color-warm-400: #9B9690;
+  --color-warm-500: #6B6560;
+  --color-warm-600: #4A4640;
+  --color-warm-700: #302D28;
+  --color-warm-800: #1C1917;
+  --color-warm-900: #0F0D0C;
+
+  /* Typography */
+  --font-sans: 'Geist', 'Inter', system-ui, sans-serif;
+  --font-arabic: 'Amiri Quran', 'Traditional Arabic', serif;
+
+  /* Radius */
+  --radius-card: 20px;
+  --radius-pill: 100px;
+  --radius-input: 12px;
+
+  /* Shadows */
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.07), 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.10), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --shadow-float: 0 16px 40px rgba(0, 0, 0, 0.12);
+}
+
+/* Base */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #F9F5EE;
+  color: #1C1917;
+  line-height: 1.6;
+}
+
+/* Arabic text */
+.arabic {
+  font-family: var(--font-arabic);
+  direction: rtl;
+  text-align: right;
+  line-height: 2.4;
+}
+
+/* Card swipe animations */
+.verse-card {
+  user-select: none;
+  touch-action: pan-y;
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Hide scrollbar but keep scroll */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #1C1917;
+    color: #F9F5EE;
+  }
+}
