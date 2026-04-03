@@ -3,6 +3,7 @@ import { Bell } from 'lucide-react'
 import BottomNav from '../components/ui/BottomNav'
 import { useGoal, useProgress, useSessions } from '../hooks/useGoal'
 import { useStreak } from '../hooks/useStreak'
+import { cn } from '../lib/utils'
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
@@ -13,31 +14,55 @@ function getGregorianDate(): string {
 
 // Simple Hijri date approximation
 function getHijriDate(): string {
-  // Using a simple algorithm: reference point 1 Muharram 1447 = July 7, 2025
+  // Reference: 1 Muharram 1447 = July 7, 2025
   const reference = new Date('2025-07-07')
   const today = new Date()
   const diffDays = Math.floor((today.getTime() - reference.getTime()) / (1000 * 60 * 60 * 24))
-  const hijriDay = (diffDays % 354) + 1
 
   const hijriMonths = [
     'Muharram', 'Safar', 'Rabi al-Awwal', 'Rabi al-Thani',
-    'Jumada al-Awwal', 'Jumada al-Thani', 'Rajab', 'Sha\'ban',
-    'Ramadan', 'Shawwal', 'Dhu al-Qi\'dah', 'Dhu al-Hijjah'
+    'Jumada al-Awwal', 'Jumada al-Thani', 'Rajab', "Sha'ban",
+    'Ramadan', 'Shawwal', 'Dhu al-Qi\'dah', 'Dhu al-Hijjah',
   ]
 
-  let monthDay = hijriDay
+  let monthDay = (diffDays % 354) + 1
   let monthIdx = 0
   const monthLengths = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29]
   for (let i = 0; i < 12; i++) {
-    if (monthDay <= monthLengths[i]) {
-      monthIdx = i
-      break
-    }
+    if (monthDay <= monthLengths[i]) { monthIdx = i; break }
     monthDay -= monthLengths[i]
   }
 
   const hijriYear = 1447 + Math.floor(diffDays / 354)
   return `${monthDay} ${hijriMonths[monthIdx]} ${hijriYear}`
+}
+
+// SVG circular progress
+function CircularProgress({ percent }: { percent: number }) {
+  const r = 24
+  const circ = 2 * Math.PI * r
+  const offset = circ - (percent / 100) * circ
+  return (
+    <svg width="56" height="56" viewBox="0 0 56 56" className="flex-shrink-0">
+      <circle cx="28" cy="28" r={r} fill="none" stroke="#E7E5E4" strokeWidth="4" />
+      <circle
+        cx="28" cy="28" r={r}
+        fill="none" stroke="#5C8B61" strokeWidth="4"
+        strokeDasharray={circ}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        transform="rotate(-90 28 28)"
+        style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+      />
+      <text
+        x="28" y="28" textAnchor="middle" dy="0.35em"
+        fontSize="10" fontWeight="700" fill="#5C8B61"
+        fontFamily="Geist, sans-serif"
+      >
+        {percent}%
+      </text>
+    </svg>
+  )
 }
 
 export default function Home() {
@@ -53,275 +78,170 @@ export default function Home() {
   const endPage = Math.min(604, startPage + dailyPages - 1)
   const pagesReadToday = sessions.pagesReadToday
   const progressPercent = Math.min(100, Math.round((pagesReadToday / dailyPages) * 100))
-
   const last7Days = getLast7Days()
-
-  // SVG circular progress
-  const radius = 36
-  const circumference = 2 * Math.PI * radius
-  const dashOffset = circumference - (progressPercent / 100) * circumference
 
   return (
     <div
-      style={{
-        minHeight: '100dvh',
-        background: '#F9F5EE',
-        paddingBottom: '80px',
-        maxWidth: '480px',
-        margin: '0 auto',
-      }}
+      className="min-h-dvh pb-24"
+      style={{ background: '#F9F5EE', maxWidth: '480px', margin: '0 auto' }}
     >
-      {/* Header */}
-      <div
-        style={{
-          padding: '56px 24px 20px',
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-        }}
-      >
+      {/* ── Header ──────────────────────────────────────────── */}
+      <div className="flex items-start justify-between px-6 pt-12 pb-2">
         <div>
-          <p
-            style={{
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#1C1917',
-              margin: 0,
-              letterSpacing: '-0.01em',
-            }}
-          >
+          <p style={{ fontSize: '13px', color: '#78716C', letterSpacing: '0.01em', margin: 0 }}>
             {getGregorianDate()}
           </p>
-          <p style={{ fontSize: '13px', color: '#6B6560', margin: '2px 0 0', fontWeight: 400 }}>
+          <p style={{ fontSize: '11px', color: '#A8A29E', letterSpacing: '0.03em', margin: '2px 0 0' }}>
             {getHijriDate()}
           </p>
         </div>
-
         <button
-          style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '50%',
-            border: '1.5px solid #E8DDD0',
-            background: '#FFFFFF',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-          }}
+          className="flex items-center justify-center w-10 h-10 rounded-full"
+          style={{ border: '1px solid #E7E5E4', background: '#FFFFFF', cursor: 'pointer' }}
         >
-          <Bell size={18} color="#6B6560" strokeWidth={1.8} />
+          <Bell size={20} color="#78716C" strokeWidth={1.6} />
         </button>
       </div>
 
-      <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {/* Werd card */}
-        <div
-          style={{
-            background: '#FFFFFF',
-            borderRadius: '20px',
-            padding: '24px',
-            boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
-          }}
-        >
-          <p style={{ fontSize: '11px', fontWeight: 700, color: '#6B6560', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 16px' }}>
-            Your werd today
-          </p>
+      {/* ── Streak ──────────────────────────────────────────── */}
+      <div className="px-6 pt-8 pb-6">
+        {/* Big number */}
+        <div className="flex items-baseline gap-2">
+          <span
+            style={{ fontSize: '72px', fontWeight: 700, letterSpacing: '-0.04em', color: '#1C1917', lineHeight: 1 }}
+          >
+            {streak.current_streak}
+          </span>
+          <span style={{ fontSize: '15px', color: '#78716C', fontWeight: 400 }}>day streak</span>
+        </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {/* Left side info */}
-            <div style={{ flex: 1 }}>
-              {/* Session dots */}
-              <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
-                {Array.from({ length: sessionsPerDay }).map((_, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      width: '10px',
-                      height: '10px',
-                      borderRadius: '50%',
-                      background: i < doneCount ? '#5C8B61' : 'transparent',
-                      border: `2px solid ${i < doneCount ? '#5C8B61' : '#D4C9B8'}`,
-                      transition: 'all 0.3s',
-                    }}
-                  />
-                ))}
-                <span style={{ fontSize: '12px', color: '#6B6560', marginLeft: '4px' }}>
-                  Session {doneCount + 1} of {sessionsPerDay}
+        {/* Weekly dots */}
+        <div className="flex gap-2 mt-4">
+          {last7Days.map((day, i) => {
+            const isToday = i === 6
+            const dow = new Date(day.date).getDay()
+            const label = DAY_LABELS[dow === 0 ? 6 : dow - 1]
+            return (
+              <div key={i} className="flex flex-col items-center gap-1.5 flex-1">
+                <div
+                  className={cn(
+                    'w-8 h-8 rounded-full',
+                    day.completed
+                      ? isToday
+                        ? 'bg-[#5C8B61] ring-2 ring-[#5C8B61] ring-offset-2 ring-offset-[#F9F5EE]'
+                        : 'bg-[#5C8B61]'
+                      : 'bg-[#E7E5E4]'
+                  )}
+                />
+                <span style={{ fontSize: '10px', color: '#A8A29E', letterSpacing: '0.05em', textAlign: 'center' }}>
+                  {label}
                 </span>
               </div>
+            )
+          })}
+        </div>
+      </div>
 
-              {/* Progress bar */}
-              <div style={{ marginBottom: '6px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#1C1917' }}>
-                    {pagesReadToday} / {dailyPages} pages
-                  </span>
-                  <span style={{ fontSize: '12px', color: '#6B6560' }}>
-                    Pages {startPage}–{endPage}
-                  </span>
-                </div>
-                <div
-                  style={{
-                    height: '5px',
-                    background: '#E8DDD0',
-                    borderRadius: '100px',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <div
-                    style={{
-                      height: '100%',
-                      width: `${progressPercent}%`,
-                      background: '#5C8B61',
-                      borderRadius: '100px',
-                      transition: 'width 0.5s ease',
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Circular progress */}
-            <svg width="88" height="88" style={{ flexShrink: 0 }}>
-              <circle cx="44" cy="44" r={radius} fill="none" stroke="#E8DDD0" strokeWidth="6" />
-              <circle
-                cx="44"
-                cy="44"
-                r={radius}
-                fill="none"
-                stroke="#5C8B61"
-                strokeWidth="6"
-                strokeDasharray={circumference}
-                strokeDashoffset={dashOffset}
-                strokeLinecap="round"
-                transform="rotate(-90 44 44)"
-                style={{ transition: 'stroke-dashoffset 0.5s ease' }}
-              />
-              <text
-                x="44"
-                y="44"
-                textAnchor="middle"
-                dy="0.35em"
-                fontSize="14"
-                fontWeight="700"
-                fill="#1C1917"
-                fontFamily="Geist, sans-serif"
-              >
-                {progressPercent}%
-              </text>
-            </svg>
-          </div>
-
-          {/* Continue reading button */}
+      {/* ── Werd card ───────────────────────────────────────── */}
+      <div
+        className="mx-6 rounded-[20px] p-5"
+        style={{
+          background: '#FFFFFF',
+          boxShadow: '0 2px 16px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04)',
+        }}
+      >
+        {/* Top row */}
+        <div className="flex items-center justify-between mb-4">
+          <span style={{ fontSize: '11px', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#A8A29E' }}>
+            Today
+          </span>
           <button
-            onClick={() => navigate(`/read?page=${progress.currentPage}`)}
-            style={{
-              width: '100%',
-              background: '#5C8B61',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: '12px',
-              padding: '14px',
-              fontSize: '15px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              marginTop: '16px',
-              fontFamily: 'var(--font-sans)',
-            }}
+            className="text-[11px] font-medium"
+            style={{ color: '#5C8B61', background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'Geist', sans-serif" }}
           >
-            Continue reading
+            mark done
           </button>
         </div>
 
-        {/* Streak section */}
-        <div
-          style={{
-            background: '#FFFFFF',
-            borderRadius: '20px',
-            padding: '24px',
-            boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
-          }}
-        >
-          <p style={{ fontSize: '11px', fontWeight: 700, color: '#6B6560', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 12px' }}>
-            Your streak
-          </p>
-
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '16px' }}>
-            <span
-              style={{
-                fontSize: '48px',
-                fontWeight: 800,
-                color: '#5C8B61',
-                lineHeight: 1,
-                letterSpacing: '-0.03em',
-              }}
+        {/* Middle */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <p style={{ fontSize: '13px', color: '#78716C', margin: 0 }}>
+              Session {doneCount + 1} of {sessionsPerDay}
+            </p>
+            <p
+              style={{ fontSize: '22px', fontWeight: 700, color: '#1C1917', letterSpacing: '-0.02em', margin: '4px 0 2px', lineHeight: 1.2 }}
             >
-              {streak.current_streak}
-            </span>
-            <span style={{ fontSize: '16px', color: '#6B6560', fontWeight: 500 }}>days</span>
+              {pagesReadToday} / {dailyPages} pages
+            </p>
+            <p style={{ fontSize: '13px', color: '#A8A29E', margin: 0 }}>
+              Pages {startPage} – {endPage}
+            </p>
           </div>
-
-          {/* Weekly strip */}
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            {last7Days.map((day, i) => (
-              <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }}>
-                <div
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    background: day.completed ? '#5C8B61' : '#F2EBE0',
-                    border: `2px solid ${day.completed ? '#5C8B61' : '#E8DDD0'}`,
-                    transition: 'all 0.2s',
-                  }}
-                />
-                <span style={{ fontSize: '10px', color: '#9B9690', fontWeight: 500 }}>
-                  {DAY_LABELS[new Date(day.date).getDay() === 0 ? 6 : new Date(day.date).getDay() - 1]}
-                </span>
-              </div>
-            ))}
-          </div>
+          <CircularProgress percent={progressPercent} />
         </div>
 
-        {/* Continue reading preview */}
+        {/* Session dots */}
+        <div className="flex gap-1.5 mt-4">
+          {Array.from({ length: sessionsPerDay }).map((_, i) => (
+            <div
+              key={i}
+              className="w-2 h-2 rounded-full"
+              style={{ background: i < doneCount ? '#5C8B61' : '#E7E5E4' }}
+            />
+          ))}
+        </div>
+
+        {/* Continue button */}
         <button
           onClick={() => navigate(`/read?page=${progress.currentPage}`)}
+          className="w-full rounded-xl mt-4 transition-colors duration-150"
           style={{
-            background: '#FFFFFF',
-            borderRadius: '20px',
-            padding: '20px 24px',
-            boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
-            border: 'none',
-            cursor: 'pointer',
-            width: '100%',
-            textAlign: 'left',
-            fontFamily: 'var(--font-sans)',
+            background: '#1C1917', color: '#F9F5EE',
+            padding: '14px', fontSize: '14px', fontWeight: 600,
+            border: 'none', cursor: 'pointer', fontFamily: "'Geist', sans-serif",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = '#2C2926')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = '#1C1917')}
+        >
+          Continue reading →
+        </button>
+      </div>
+
+      {/* ── Continue reading preview ─────────────────────────── */}
+      <div
+        className="mx-6 mt-4 rounded-[20px] p-5"
+        style={{
+          background: '#FFFFFF',
+          boxShadow: '0 1px 8px rgba(0,0,0,0.04)',
+        }}
+      >
+        <p style={{ fontSize: '11px', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#A8A29E', margin: '0 0 12px' }}>
+          Continue reading
+        </p>
+
+        {/* Arabic preview */}
+        <p
+          className="text-right"
+          style={{
+            fontFamily: "'Amiri Quran', serif",
+            fontSize: '20px',
+            lineHeight: 2.2,
+            direction: 'rtl',
+            color: '#1C1917',
+            margin: '0 0 8px',
           }}
         >
-          <p style={{ fontSize: '11px', fontWeight: 700, color: '#6B6560', textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 12px' }}>
-            Continue reading
-          </p>
-          <p
-            style={{
-              fontFamily: "'Amiri Quran', serif",
-              fontSize: '20px',
-              lineHeight: 2.2,
-              direction: 'rtl',
-              textAlign: 'right',
-              color: '#1C1917',
-              margin: '0 0 8px',
-            }}
-          >
-            بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
-          </p>
-          <p style={{ fontSize: '13px', color: '#6B6560', fontStyle: 'italic', margin: 0, lineHeight: 1.5 }}>
-            In the name of Allah, the Entirely Merciful, the Especially Merciful.
-          </p>
-          <p style={{ fontSize: '12px', color: '#9B9690', margin: '8px 0 0', fontWeight: 500 }}>
-            Page {progress.currentPage} — Al-Fatiha 1:1
-          </p>
-        </button>
+          بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+        </p>
+
+        {/* Translation */}
+        <p
+          style={{ fontSize: '13px', color: '#78716C', lineHeight: 1.6, margin: 0 }}
+          className="line-clamp-2"
+        >
+          In the name of Allah, the Entirely Merciful, the Especially Merciful.
+        </p>
       </div>
 
       <BottomNav />

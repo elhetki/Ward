@@ -33,7 +33,7 @@ export async function fetchChapter(id: number): Promise<Chapter> {
 export async function fetchVersesByPage(page: number): Promise<Verse[]> {
   const fields = 'text_uthmani,verse_key,chapter_id,page_number,juz_number'
   const data = await fetchWithCache<{ verses: Verse[] }>(
-    `${BASE_URL}/verses/by_page/${page}?translations=131&fields=${fields}`
+    `${BASE_URL}/verses/by_page/${page}?translations=20&fields=${fields}`
   )
   return data.verses
 }
@@ -45,7 +45,7 @@ export async function fetchVersesBySurah(
   const fields = 'text_uthmani,verse_key,chapter_id,page_number,juz_number'
   const pageParam = page ? `&page=${page}` : ''
   const data = await fetchWithCache<{ verses: Verse[] }>(
-    `${BASE_URL}/verses/by_chapter/${surahId}?translations=131&fields=${fields}&per_page=50${pageParam}`
+    `${BASE_URL}/verses/by_chapter/${surahId}?translations=20&fields=${fields}&per_page=50${pageParam}`
   )
   return data.verses
 }
@@ -60,7 +60,7 @@ export async function fetchJuzs(): Promise<Juz[]> {
 export async function fetchVersesByJuz(juzNumber: number): Promise<Verse[]> {
   const fields = 'text_uthmani,verse_key,chapter_id,page_number,juz_number'
   const data = await fetchWithCache<{ verses: Verse[] }>(
-    `${BASE_URL}/verses/by_juz/${juzNumber}?translations=131&fields=${fields}&per_page=50`
+    `${BASE_URL}/verses/by_juz/${juzNumber}?translations=20&fields=${fields}&per_page=50`
   )
   return data.verses
 }
@@ -75,9 +75,15 @@ export function getAudioUrl(
   return `https://everyayah.com/data/${reciter}/${s}${a}.mp3`
 }
 
+// Strip the Arabic End of Ayah character (U+06DD) and trailing numbers from uthmani text
+export function cleanUthmaniText(text: string): string {
+  // Remove U+06DD and any numbers/arabic-extended digits that follow it
+  return text.replace(/\u06DD[\u0660-\u0669\u06F0-\u06F90-9]*/g, '').trim()
+}
+
 // Clear specific page from cache (to force refresh)
 export function invalidatePageCache(page: number): void {
   const fields = 'text_uthmani,verse_key,chapter_id,page_number,juz_number'
-  const url = `${BASE_URL}/verses/by_page/${page}?translations=131&fields=${fields}`
+  const url = `${BASE_URL}/verses/by_page/${page}?translations=20&fields=${fields}`
   cache.delete(url)
 }

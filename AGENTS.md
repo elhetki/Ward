@@ -28,3 +28,12 @@ Ward is a Quran daily reading habit app. Calm, spiritual design. Tracks reading 
 - `src/stores/` — state management (localStorage)
 - `src/hooks/` — custom hooks
 - `src/lib/` — Supabase client, utils
+
+## Customer Data Protection (NON-NEGOTIABLE)
+1. NEVER delete customer data — soft-delete only
+2. NEVER modify customer settings on deploy/migration
+3. NEVER drop columns with data — add new, deprecate old
+4. NEVER change existing enum values — only add new ones
+5. ALWAYS set defaults for new columns
+6. ALWAYS verify RLS on customer data tables
+7. If in doubt: don't touch it, ask first

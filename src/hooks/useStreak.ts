@@ -1,108 +1,125 @@
 import { useState, useCallback } from 'react'
-import type { Streak } from '../types'
 
 const STORAGE_KEY = 'ward_streak'
+const DATES_KEY = 'ward_completed_dates' // array of 'YYYY-MM-DD' strings
 
-function getTodayStr(): string {
+function today(): string {
   return new Date().toISOString().split('T')[0]
 }
 
-function getYesterdayStr(): string {
+function yesterday(): string {
   const d = new Date()
   d.setDate(d.getDate() - 1)
   return d.toISOString().split('T')[0]
 }
 
-function getDefaultStreak(): Streak {
-  return {
-    current_streak: 0,
-    longest_streak: 0,
-    last_completed_date: '',
-    freeze_available: true,
-  }
+function dateNDaysAgo(n: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  return d.toISOString().split('T')[0]
 }
 
-function loadStreak(): Streak {
+interface StreakState {
+  current_streak: number
+  longest_streak: number
+  last_completed_date: string
+  freeze_available: boolean
+}
+
+const DEFAULT_STREAK: StreakState = {
+  current_streak: 0,
+  longest_streak: 0,
+  last_completed_date: '',
+  freeze_available: true,
+}
+
+function loadStreak(): StreakState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch { /* noop */ }
-  return getDefaultStreak()
+    if (raw) return { ...DEFAULT_STREAK, ...JSON.parse(raw) }
+  } catch {}
+  return DEFAULT_STREAK
+}
+
+function loadCompletedDates(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DATES_KEY)
+    if (raw) return new Set(JSON.parse(raw))
+  } catch {}
+  return new Set()
+}
+
+function saveCompletedDates(dates: Set<string>) {
+  // Keep only last 90 days to avoid bloat
+  const sorted = Array.from(dates).sort().slice(-90)
+  localStorage.setItem(DATES_KEY, JSON.stringify(sorted))
 }
 
 export function useStreak() {
-  const [streak, setStreakState] = useState<Streak>(loadStreak)
+  const [streak, setStreakState] = useState<StreakState>(loadStreak)
+  const [completedDates, setCompletedDates] = useState<Set<string>>(loadCompletedDates)
 
-  const saveStreak = useCallback((s: Streak) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
+  const save = (s: StreakState) => {
     setStreakState(s)
-  }, [])
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
+  }
 
   const markDayComplete = useCallback(() => {
-    const today = getTodayStr()
-    const yesterday = getYesterdayStr()
     const current = loadStreak()
+    const todayStr = today()
+    const yesterdayStr = yesterday()
 
-    if (current.last_completed_date === today) {
-      // Already completed today, no change
-      return current
-    }
+    // Already marked today
+    if (current.last_completed_date === todayStr) return
+
+    // Update completed dates
+    const dates = loadCompletedDates()
+    dates.add(todayStr)
+    saveCompletedDates(dates)
+    setCompletedDates(new Set(dates))
 
     let newStreak: number
     if (
-      current.last_completed_date === yesterday ||
-      current.last_completed_date === '' // first time
+      current.last_completed_date === yesterdayStr ||
+      current.last_completed_date === ''
     ) {
       newStreak = current.current_streak + 1
     } else {
-      // Streak broken
+      // Streak broken — reset to 1
       newStreak = 1
     }
 
-    const updated: Streak = {
+    save({
       current_streak: newStreak,
       longest_streak: Math.max(current.longest_streak, newStreak),
-      last_completed_date: today,
+      last_completed_date: todayStr,
       freeze_available: current.freeze_available,
-    }
-
-    saveStreak(updated)
-    return updated
-  }, [saveStreak])
+    })
+  }, [])
 
   const freezeStreak = useCallback(() => {
     const current = loadStreak()
-    if (!current.freeze_available) return false
-
-    // Use a freeze to keep streak alive for today without reading
-    const today = getTodayStr()
-    const updated: Streak = {
+    if (!current.freeze_available) return
+    const todayStr = today()
+    // Mark today as completed (freeze) without counting as a real reading
+    const dates = loadCompletedDates()
+    dates.add(todayStr)
+    saveCompletedDates(dates)
+    setCompletedDates(new Set(dates))
+    save({
       ...current,
-      last_completed_date: today,
+      last_completed_date: todayStr,
       freeze_available: false,
-    }
-    saveStreak(updated)
-    return true
-  }, [saveStreak])
-
-  // Get last 7 days activity
-  const getLast7Days = useCallback((): { date: string; completed: boolean }[] => {
-    const current = loadStreak()
-    const days = []
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date()
-      d.setDate(d.getDate() - i)
-      const dateStr = d.toISOString().split('T')[0]
-      // Simple heuristic: if last_completed_date is within range of current streak
-      // This is approximate without a full history store
-      const dayOffset = i
-      const streakLength = current.current_streak
-      // A day is "completed" if it falls within the current streak window
-      const completed = dayOffset < streakLength
-      days.push({ date: dateStr, completed })
-    }
-    return days
+    })
   }, [])
+
+  const getLast7Days = useCallback((): { date: string; completed: boolean }[] => {
+    const dates = loadCompletedDates()
+    return Array.from({ length: 7 }, (_, i) => {
+      const dateStr = dateNDaysAgo(6 - i) // index 0 = 6 days ago, index 6 = today
+      return { date: dateStr, completed: dates.has(dateStr) }
+    })
+  }, [completedDates])
 
   return { streak, markDayComplete, freezeStreak, getLast7Days }
 }

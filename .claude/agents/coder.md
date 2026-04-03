@@ -16,6 +16,7 @@ Before any work:
 
 After any work:
 1. Run `npm run build` — must pass clean (TypeScript + Vite)
+2. Run post-build audit: `bash /root/.openclaw/workspace/skills/quality-gate/scripts/post-build-audit.sh .` — fix all errors
 
 Key rules:
 - Cream (#F9F5EE) + sage green (#5C8B61) color scheme — don't change

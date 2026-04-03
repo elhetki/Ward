@@ -2,17 +2,18 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  X, SlidersHorizontal, Play, Pause, SkipBack, SkipForward,
-  Bookmark, ChevronLeft, ChevronRight
+  X, SlidersHorizontal, Play, Pause,
+  Bookmark, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useVersesByPage } from '../hooks/useQuranApi'
 import { useGoal, useProgress, useSessions } from '../hooks/useGoal'
 import { useStreak } from '../hooks/useStreak'
-import { getAudioUrl } from '../lib/quranApi'
+import { getAudioUrl, cleanUthmaniText } from '../lib/quranApi'
 import SessionComplete from '../components/ui/SessionComplete'
+import { cn } from '../lib/utils'
 import type { ReadingPreferences } from '../types'
 
-const FONT_SIZE_MAP = { small: 22, medium: 28, large: 34, huge: 42 }
+const FONT_SIZE_MAP = { small: 22, medium: 30, large: 36, huge: 44 }
 const SPEED_OPTIONS: ReadingPreferences['playback_speed'][] = [0.75, 1, 1.25, 1.5]
 
 const DEFAULT_PREFS: ReadingPreferences = {
@@ -38,28 +39,45 @@ function savePrefs(prefs: ReadingPreferences) {
   localStorage.setItem('ward_preferences', JSON.stringify(prefs))
 }
 
-// Verse skeleton
+// ─── Skeleton ───────────────────────────────────────────────────────────────
 function VerseSkeleton() {
   return (
     <div
-      style={{
-        background: '#FFFFFF',
-        borderRadius: '20px',
-        padding: '32px 28px',
-        minHeight: '320px',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
-      }}
+      className="bg-white rounded-[24px] px-7 py-8"
+      style={{ minHeight: '340px', boxShadow: '0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.05)' }}
     >
-      <div style={{ height: '12px', background: '#F2EBE0', borderRadius: '6px', width: '40%', marginLeft: 'auto', marginBottom: '24px' }} />
-      <div style={{ height: '28px', background: '#F2EBE0', borderRadius: '6px', marginBottom: '12px' }} />
-      <div style={{ height: '28px', background: '#F2EBE0', borderRadius: '6px', width: '80%', marginLeft: 'auto', marginBottom: '24px' }} />
-      <div style={{ height: '1px', background: '#E8DDD0', marginBottom: '20px' }} />
-      <div style={{ height: '14px', background: '#F2EBE0', borderRadius: '6px', marginBottom: '8px' }} />
-      <div style={{ height: '14px', background: '#F2EBE0', borderRadius: '6px', width: '70%' }} />
+      <div className="h-3 bg-[#F2EBE0] rounded-full w-1/3 ml-auto mb-8" />
+      <div className="h-8 bg-[#F2EBE0] rounded-full mb-3" />
+      <div className="h-8 bg-[#F2EBE0] rounded-full w-4/5 mx-auto mb-10" />
+      <div className="h-px bg-[#F0EDE8] mb-6" />
+      <div className="h-4 bg-[#F2EBE0] rounded-full mb-2 w-full" />
+      <div className="h-4 bg-[#F2EBE0] rounded-full w-3/4 mx-auto" />
     </div>
   )
 }
 
+// ─── Toggle ─────────────────────────────────────────────────────────────────
+function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      onClick={onToggle}
+      className={cn(
+        'relative w-[52px] h-7 rounded-full transition-colors duration-200 flex-shrink-0 cursor-pointer',
+        on ? 'bg-[#5C8B61]' : 'bg-[#E7E5E4]'
+      )}
+      style={{ border: 'none', padding: 0 }}
+    >
+      <span
+        className="absolute top-[3px] left-[3px] w-[22px] h-[22px] bg-white rounded-full shadow-sm transition-transform duration-200"
+        style={{ transform: on ? 'translateX(24px)' : 'translateX(0)' }}
+      />
+    </button>
+  )
+}
+
+// ─── Settings sheet ──────────────────────────────────────────────────────────
 interface SettingsSheetProps {
   prefs: ReadingPreferences
   onChange: (prefs: ReadingPreferences) => void
@@ -79,61 +97,42 @@ function SettingsSheet({ prefs, onChange, onClose }: SettingsSheetProps) {
       animate={{ y: 0 }}
       exit={{ y: '100%' }}
       transition={{ type: 'spring', stiffness: 350, damping: 35 }}
+      className="fixed bottom-0 left-0 right-0 bg-white overflow-y-auto"
       style={{
-        position: 'fixed',
-        bottom: 0, left: 0, right: 0,
-        background: '#FFFFFF',
-        borderTopLeftRadius: '24px',
-        borderTopRightRadius: '24px',
-        padding: '24px',
+        borderTopLeftRadius: '28px',
+        borderTopRightRadius: '28px',
+        padding: '24px 24px 40px',
         zIndex: 80,
         maxHeight: '80vh',
-        overflowY: 'auto',
-        boxShadow: '0 -8px 40px rgba(0,0,0,0.12)',
         maxWidth: '480px',
         margin: '0 auto',
+        boxShadow: '0 -8px 40px rgba(0,0,0,0.12)',
       }}
     >
       {/* Handle */}
-      <div style={{ width: '36px', height: '4px', background: '#E8DDD0', borderRadius: '100px', margin: '0 auto 20px' }} />
+      <div className="w-10 h-1 bg-[#E7E5E4] rounded-full mx-auto mb-6" />
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1C1917', margin: 0 }}>Preferences</h2>
-        <button
-          onClick={onClose}
-          style={{
-            width: '32px', height: '32px', borderRadius: '50%',
-            border: '1.5px solid #E8DDD0', background: 'transparent',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <X size={16} color="#6B6560" />
-        </button>
-      </div>
+      <h2 style={{ fontSize: '17px', fontWeight: 600, color: '#1C1917', margin: '0 0 24px' }}>
+        Reading preferences
+      </h2>
 
       {/* Font size */}
-      <div style={{ marginBottom: '24px' }}>
-        <label style={{ fontSize: '13px', fontWeight: 600, color: '#6B6560', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '12px' }}>
+      <div className="mb-6">
+        <label style={{ fontSize: '12px', fontWeight: 600, color: '#A8A29E', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '12px' }}>
           Arabic font size
         </label>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="flex gap-2">
           {(['small', 'medium', 'large', 'huge'] as const).map((size) => (
             <button
               key={size}
               onClick={() => update({ font_size: size })}
-              style={{
-                flex: 1,
-                padding: '10px 4px',
-                borderRadius: '10px',
-                border: `2px solid ${prefs.font_size === size ? '#5C8B61' : '#E8DDD0'}`,
-                background: prefs.font_size === size ? '#F0F7F1' : '#FFFFFF',
-                color: prefs.font_size === size ? '#5C8B61' : '#6B6560',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: 'var(--font-sans)',
-                textTransform: 'capitalize',
-              }}
+              className={cn(
+                'flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-colors duration-150 capitalize',
+                prefs.font_size === size
+                  ? 'bg-[#F4FAF5] text-[#5C8B61] border-[#5C8B61]'
+                  : 'bg-white text-[#78716C] border-[#E7E5E4]'
+              )}
+              style={{ border: `1.5px solid ${prefs.font_size === size ? '#5C8B61' : '#E7E5E4'}`, cursor: 'pointer', fontFamily: "'Geist', sans-serif" }}
             >
               {size}
             </button>
@@ -147,47 +146,25 @@ function SettingsSheet({ prefs, onChange, onClose }: SettingsSheetProps) {
         { key: 'show_transliteration' as const, label: 'Show Transliteration' },
         { key: 'sounds' as const, label: 'Sounds' },
         { key: 'haptics' as const, label: 'Haptics' },
-      ].map(({ key, label }) => (
+      ].map(({ key, label }, idx, arr) => (
         <div
           key={key}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid #F2EBE0' }}
+          className={cn(
+            'flex items-center justify-between py-4',
+            idx < arr.length - 1 && 'border-b border-[#F0EDE8]'
+          )}
         >
           <span style={{ fontSize: '15px', color: '#1C1917', fontWeight: 500 }}>{label}</span>
-          <button
-            onClick={() => update({ [key]: !prefs[key] })}
-            style={{
-              width: '48px', height: '28px',
-              borderRadius: '100px',
-              background: prefs[key] ? '#5C8B61' : '#E8DDD0',
-              border: 'none',
-              cursor: 'pointer',
-              position: 'relative',
-              transition: 'background 0.2s',
-            }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                top: '3px',
-                left: prefs[key] ? '23px' : '3px',
-                width: '22px',
-                height: '22px',
-                borderRadius: '50%',
-                background: '#FFFFFF',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-                transition: 'left 0.2s',
-              }}
-            />
-          </button>
+          <Toggle on={!!prefs[key]} onToggle={() => update({ [key]: !prefs[key] })} />
         </div>
       ))}
 
       {/* Reciter */}
-      <div style={{ marginTop: '20px' }}>
-        <label style={{ fontSize: '13px', fontWeight: 600, color: '#6B6560', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '12px' }}>
+      <div className="mt-6">
+        <label style={{ fontSize: '12px', fontWeight: 600, color: '#A8A29E', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '12px' }}>
           Reciter
         </label>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="flex gap-2">
           {[
             { id: 'Alafasy_128kbps' as const, label: 'Alafasy' },
             { id: 'Abdul_Basit_Murattal_192kbps' as const, label: 'Abdul Basit' },
@@ -195,28 +172,31 @@ function SettingsSheet({ prefs, onChange, onClose }: SettingsSheetProps) {
             <button
               key={id}
               onClick={() => update({ reciter: id })}
-              style={{
-                flex: 1,
-                padding: '12px',
-                borderRadius: '100px',
-                border: `2px solid ${prefs.reciter === id ? '#5C8B61' : '#E8DDD0'}`,
-                background: prefs.reciter === id ? '#5C8B61' : '#FFFFFF',
-                color: prefs.reciter === id ? '#FFFFFF' : '#6B6560',
-                fontSize: '14px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: 'var(--font-sans)',
-              }}
+              className={cn(
+                'flex-1 py-3 rounded-full text-[14px] font-semibold transition-colors duration-150',
+                prefs.reciter === id ? 'bg-[#1C1917] text-white' : 'bg-white text-[#78716C]'
+              )}
+              style={{ border: `1.5px solid ${prefs.reciter === id ? '#1C1917' : '#E7E5E4'}`, cursor: 'pointer', fontFamily: "'Geist', sans-serif" }}
             >
               {label}
             </button>
           ))}
         </div>
       </div>
+
+      {/* Close */}
+      <button
+        onClick={onClose}
+        className="w-full mt-6 py-4 rounded-2xl text-[15px] font-semibold transition-colors duration-150"
+        style={{ background: '#F9F5EE', color: '#1C1917', border: 'none', cursor: 'pointer', fontFamily: "'Geist', sans-serif" }}
+      >
+        Done
+      </button>
     </motion.div>
   )
 }
 
+// ─── Main Reader ─────────────────────────────────────────────────────────────
 export default function Reader() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -224,12 +204,11 @@ export default function Reader() {
 
   const [currentPage, setCurrentPage] = useState(initialPage)
   const [verseIndex, setVerseIndex] = useState(0)
-  const [direction, setDirection] = useState(0) // -1 prev, 1 next
+  const [direction, setDirection] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const [showComplete, setShowComplete] = useState(false)
   const [prefs, setPrefs] = useState<ReadingPreferences>(loadPrefs)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [audioProgress, setAudioProgress] = useState(0)
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [progressPulse, setProgressPulse] = useState(false)
 
@@ -242,17 +221,18 @@ export default function Reader() {
 
   const totalVerses = verses.length
   const currentVerse = verses[verseIndex]
-
-  // Session tracking
   const sessionsPerDay = goal?.sessionsPerDay ?? 2
   const currentSessionIdx = doneCount
-
-  // Progress within session (approximate: 1 session = 1 page or so)
   const sessionProgressPercent = totalVerses > 0
     ? Math.round(((verseIndex + 1) / totalVerses) * 100)
     : 0
 
-  // Save progress whenever verse changes
+  const fontSize = FONT_SIZE_MAP[prefs.font_size]
+  const [surahId, verseNum] = currentVerse
+    ? currentVerse.verse_key.split(':')
+    : ['', '']
+
+  // Save progress
   useEffect(() => {
     if (currentVerse) {
       saveProgress({
@@ -263,11 +243,11 @@ export default function Reader() {
     }
   }, [currentVerse, currentPage, saveProgress])
 
-  // Audio
+  // Audio helpers
   const getAudio = useCallback(() => {
     if (!currentVerse) return null
-    const [surahStr, ayahStr] = currentVerse.verse_key.split(':')
-    const url = getAudioUrl(parseInt(surahStr), parseInt(ayahStr), prefs.reciter)
+    const [sId, aId] = currentVerse.verse_key.split(':')
+    const url = getAudioUrl(parseInt(sId), parseInt(aId), prefs.reciter)
     if (!audioRef.current) {
       audioRef.current = new Audio(url)
     } else {
@@ -286,25 +266,16 @@ export default function Reader() {
     } else {
       audio.play().catch(() => {})
       setIsPlaying(true)
-      audio.ontimeupdate = () => {
-        if (audio.duration) {
-          setAudioProgress((audio.currentTime / audio.duration) * 100)
-        }
-      }
-      audio.onended = () => {
-        setIsPlaying(false)
-        setAudioProgress(0)
-      }
+      audio.ontimeupdate = () => { /* intentionally empty */ }
+      audio.onended = () => { setIsPlaying(false) }
     }
   }, [getAudio, isPlaying])
 
-  // Stop audio when verse changes
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current = null
       setIsPlaying(false)
-      setAudioProgress(0)
     }
   }, [verseIndex, currentPage])
 
@@ -319,20 +290,16 @@ export default function Reader() {
       setDirection(1)
       setVerseIndex((i) => i + 1)
     } else {
-      // Move to next page
       if (currentPage < 604) {
         setDirection(1)
         setCurrentPage((p) => p + 1)
         setVerseIndex(0)
       }
-      // Check session complete
-      if (verseIndex === totalVerses - 1) {
-        completeSession(currentSessionIdx)
-        if (currentSessionIdx < sessionsPerDay - 1 || sessions.completed.every(Boolean)) {
-          markDayComplete()
-        }
-        setShowComplete(true)
+      completeSession(currentSessionIdx)
+      if (currentSessionIdx < sessionsPerDay - 1 || sessions.completed.every(Boolean)) {
+        markDayComplete()
       }
+      setShowComplete(true)
     }
   }, [verseIndex, totalVerses, currentPage, triggerProgressPulse, completeSession, currentSessionIdx, sessionsPerDay, sessions, markDayComplete])
 
@@ -347,12 +314,6 @@ export default function Reader() {
     }
   }, [verseIndex, currentPage])
 
-  const surahName = currentVerse
-    ? `Surah ${currentVerse.chapter_id}`
-    : ''
-
-  const fontSize = FONT_SIZE_MAP[prefs.font_size]
-
   const cycleSpeed = () => {
     const idx = SPEED_OPTIONS.indexOf(prefs.playback_speed)
     const next = SPEED_OPTIONS[(idx + 1) % SPEED_OPTIONS.length]
@@ -364,119 +325,71 @@ export default function Reader() {
 
   return (
     <div
-      style={{
-        minHeight: '100dvh',
-        background: '#F9F5EE',
-        display: 'flex',
-        flexDirection: 'column',
-        maxWidth: '480px',
-        margin: '0 auto',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
+      className="min-h-dvh flex flex-col relative overflow-hidden"
+      style={{ background: '#F9F5EE', maxWidth: '480px', margin: '0 auto' }}
     >
-      {/* Session progress bar */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0, left: 0,
-          height: '3px',
-          width: `${sessionProgressPercent}%`,
-          background: progressPulse ? '#7AA37E' : '#5C8B61',
-          transition: progressPulse
-            ? 'background 0.1s, width 0.5s ease'
-            : 'background 0.4s, width 0.5s ease',
-          zIndex: 10,
-        }}
-      />
-
-      {/* Top bar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '52px 20px 16px',
-        }}
-      >
+      {/* ── Top bar ─────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-5 pt-12 pb-4">
         <button
           onClick={() => navigate('/home')}
-          style={{
-            width: '40px', height: '40px',
-            borderRadius: '50%',
-            border: '1.5px solid #E8DDD0',
-            background: '#FFFFFF',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer',
-          }}
+          className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center"
+          style={{ border: 'none', cursor: 'pointer' }}
         >
-          <X size={18} color="#1C1917" strokeWidth={2} />
+          <X size={18} color="#78716C" strokeWidth={2} />
         </button>
 
-        <div style={{ textAlign: 'center' }}>
-          <p style={{ fontSize: '13px', fontWeight: 600, color: '#1C1917', margin: 0 }}>
-            Page {currentPage}
-          </p>
-          <p style={{ fontSize: '11px', color: '#6B6560', margin: '2px 0 0' }}>
-            {verseIndex + 1} / {totalVerses} verses
-          </p>
-        </div>
+        <span style={{ fontSize: '13px', fontWeight: 500, color: '#78716C' }}>
+          Page {currentPage}
+        </span>
 
         <button
           onClick={() => setShowSettings(true)}
-          style={{
-            width: '40px', height: '40px',
-            borderRadius: '50%',
-            border: '1.5px solid #E8DDD0',
-            background: '#FFFFFF',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer',
-          }}
+          className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center"
+          style={{ border: 'none', cursor: 'pointer' }}
         >
-          <SlidersHorizontal size={18} color="#1C1917" strokeWidth={1.8} />
+          <SlidersHorizontal size={18} color="#78716C" strokeWidth={1.8} />
         </button>
       </div>
 
-      {/* Card area */}
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '8px 20px',
-          position: 'relative',
-        }}
-      >
+      {/* ── Progress bar ─────────────────────────────────────── */}
+      <div className="mx-5 mb-6 h-0.5 bg-[#E7E5E4] rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-300"
+          style={{
+            width: `${sessionProgressPercent}%`,
+            background: progressPulse ? '#7AA37E' : '#5C8B61',
+            transition: 'width 0.4s ease, background 0.2s',
+          }}
+        />
+      </div>
+
+      {/* ── Card area ────────────────────────────────────────── */}
+      <div className="flex-1 flex items-center justify-center px-5">
         {loading ? (
-          <div style={{ width: '100%' }}>
-            <VerseSkeleton />
-          </div>
+          <div className="w-full"><VerseSkeleton /></div>
         ) : error ? (
-          <div style={{ textAlign: 'center', color: '#6B6560', padding: '32px' }}>
-            <p style={{ fontSize: '16px', marginBottom: '16px' }}>Could not load verses.</p>
-            <p style={{ fontSize: '14px' }}>{error}</p>
+          <div className="text-center px-8">
+            <p style={{ fontSize: '16px', color: '#78716C', marginBottom: '8px' }}>Could not load verses.</p>
+            <p style={{ fontSize: '14px', color: '#A8A29E' }}>{error}</p>
           </div>
         ) : currentVerse ? (
-          <div style={{ width: '100%', position: 'relative' }}>
+          <div className="relative w-full">
             {/* Stacked cards behind */}
             <div
+              className="absolute inset-x-0 bg-white rounded-[24px]"
               style={{
-                position: 'absolute', inset: 0,
-                borderRadius: '20px',
-                background: '#FFFFFF',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                transform: 'translateY(8px) scale(0.97)',
-                zIndex: 0,
+                top: 0, bottom: 0,
+                transform: 'translateY(8px) scaleX(0.91)',
+                opacity: 0.5,
+                zIndex: -2,
               }}
             />
             <div
+              className="absolute inset-x-0 bg-white rounded-[24px]"
               style={{
-                position: 'absolute', inset: 0,
-                borderRadius: '20px',
-                background: '#FFFFFF',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-                transform: 'translateY(16px) scale(0.94)',
+                top: 0, bottom: 0,
+                transform: 'translateY(4px) scaleX(0.96)',
+                opacity: 0.75,
                 zIndex: -1,
               }}
             />
@@ -487,103 +400,100 @@ export default function Reader() {
                 custom={direction}
                 drag="x"
                 dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={0.2}
+                dragElastic={0.1}
                 onDragEnd={(_, info) => {
                   if (info.offset.x < -80) goToNextVerse()
-                  if (info.offset.x > 80) goToPrevVerse()
+                  else if (info.offset.x > 80) goToPrevVerse()
                 }}
-                initial={{ x: direction * 320, opacity: 0 }}
+                initial={{ x: direction * 60, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
-                exit={{ x: direction * -320, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                style={{
-                  position: 'relative',
-                  zIndex: 1,
-                  cursor: 'grab',
-                  touchAction: 'pan-y',
-                  userSelect: 'none',
-                }}
+                exit={{ x: -60, opacity: 0, transition: { duration: 0.15 } }}
+                transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                style={{ position: 'relative', zIndex: 1, cursor: 'grab', touchAction: 'pan-y', userSelect: 'none' }}
               >
-                {/* Card */}
+                {/* Main card */}
                 <div
+                  className="bg-white rounded-[24px] px-7 py-8 flex flex-col"
                   style={{
-                    background: '#FFFFFF',
-                    borderRadius: '20px',
-                    boxShadow: '0 2px 12px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.05)',
-                    padding: '32px 28px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '20px',
-                    minHeight: '280px',
+                    minHeight: '340px',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.05)',
                   }}
                 >
-                  {/* Page/Juz */}
-                  <div
-                    style={{
-                      textAlign: 'right',
-                      direction: 'rtl',
-                      fontSize: '12px',
-                      color: '#9B9690',
-                      fontFamily: "'Amiri Quran', serif",
-                    }}
-                  >
-                    صفحة {currentVerse.page_number} | جزء {currentVerse.juz_number}
-                  </div>
-
-                  {/* Arabic text */}
-                  <div
-                    style={{
-                      fontFamily: "'Amiri Quran', 'Traditional Arabic', serif",
-                      fontSize: `${fontSize}px`,
-                      lineHeight: 2.4,
-                      direction: 'rtl',
-                      textAlign: 'right',
-                      color: '#1C1917',
-                      wordSpacing: '4px',
-                    }}
-                  >
-                    {currentVerse.text_uthmani}
-                    {' '}
+                  {/* Card header */}
+                  <div className="flex justify-between items-center mb-6">
+                    <span style={{ fontSize: '12px', color: '#A8A29E', fontWeight: 500, letterSpacing: '0.04em' }}>
+                      Surah {currentVerse.chapter_id}
+                    </span>
                     <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '26px',
-                        height: '26px',
-                        borderRadius: '50%',
-                        border: '1px solid #5C8B61',
-                        fontSize: '10px',
-                        color: '#5C8B61',
-                        fontFamily: "'Amiri Quran', serif",
-                        verticalAlign: 'middle',
-                      }}
+                      style={{ fontSize: '12px', color: '#A8A29E', fontFamily: "'Amiri Quran', serif", direction: 'rtl' }}
                     >
-                      {currentVerse.verse_key.split(':')[1]}
+                      صفحة {currentVerse.page_number} | جزء {currentVerse.juz_number}
                     </span>
                   </div>
 
-                  {/* Divider */}
-                  <div style={{ height: '1px', background: '#E8DDD0' }} />
-
-                  {/* Translation */}
-                  {prefs.show_translation && currentVerse.translations?.[0] && (
-                    <p
+                  {/* Arabic text — centered, dir rtl, cleaned text_uthmani */}
+                  <div
+                    className="flex-1 flex items-center justify-center flex-col"
+                  >
+                    {/* Arabic text */}
+                    <div
+                      className="w-full text-center"
                       style={{
-                        fontSize: '16px',
-                        lineHeight: 1.7,
-                        color: '#6B6560',
-                        fontStyle: 'italic',
-                        margin: 0,
+                        fontFamily: "'Amiri Quran', 'Traditional Arabic', serif",
+                        fontSize: `${fontSize}px`,
+                        lineHeight: 2.6,
+                        color: '#1C1917',
+                        direction: 'rtl',
                       }}
-                      dangerouslySetInnerHTML={{ __html: currentVerse.translations[0].text }}
-                    />
+                    >
+                      {cleanUthmaniText(currentVerse.text_uthmani)}
+                    </div>
+
+                    {/* Verse number ornament — manual, font-independent */}
+                    <div className="flex justify-center mt-3 mb-1">
+                      <span
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-full text-[11px] font-bold"
+                        style={{
+                          border: '1.5px solid #C9C5C0',
+                          color: '#78716C',
+                          fontFamily: "'Geist', sans-serif",
+                        }}
+                      >
+                        {currentVerse.verse_number}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="h-px bg-[#F0EDE8] my-5" />
+
+                  {/* Translation — centered, clean, not italic */}
+                  {prefs.show_translation && currentVerse.translations?.[0] && (
+                    <div>
+                      <p
+                        className="text-center"
+                        style={{ fontSize: '17px', color: '#4A4540', lineHeight: 1.8, margin: 0 }}
+                        dangerouslySetInnerHTML={{ __html: currentVerse.translations[0].text }}
+                      />
+                      {/* Verse reference in parentheses */}
+                      <p
+                        className="text-center mt-3"
+                        style={{ fontSize: '15px', color: '#A8A29E', margin: '12px 0 0' }}
+                      >
+                        ({surahId}:{verseNum})
+                      </p>
+                    </div>
                   )}
 
-                  {/* Caption */}
-                  <div style={{ fontSize: '12px', color: '#9B9690', fontWeight: 500, marginTop: 'auto' }}>
-                    {currentVerse.verse_key} of {totalVerses} — {surahName}
-                  </div>
+                  {/* Footer — verse ref (if no translation showing) */}
+                  {!prefs.show_translation && (
+                    <p
+                      className="text-center mt-4"
+                      style={{ fontSize: '15px', color: '#A8A29E' }}
+                    >
+                      ({surahId}:{verseNum})
+                    </p>
+                  )}
                 </div>
               </motion.div>
             </AnimatePresence>
@@ -591,183 +501,93 @@ export default function Reader() {
         ) : null}
       </div>
 
-      {/* Arrow navigation + swipe hint */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '4px 20px 8px',
-        }}
-      >
+      {/* ── Arrow navigation ─────────────────────────────────── */}
+      <div className="flex justify-between px-4 mt-4">
         <button
           onClick={goToPrevVerse}
-          style={{
-            width: '44px', height: '44px',
-            borderRadius: '50%',
-            border: '1.5px solid #E8DDD0',
-            background: '#FFFFFF',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer',
-            opacity: verseIndex === 0 && currentPage === 1 ? 0.4 : 1,
-          }}
+          className="w-8 h-8 flex items-center justify-center transition-colors duration-150 text-[#C9C5C0] hover:text-[#78716C]"
+          style={{ background: 'none', border: 'none', cursor: 'pointer' }}
         >
-          <ChevronLeft size={20} color="#1C1917" />
+          <ChevronLeft size={32} strokeWidth={1.5} />
         </button>
-
-        <p style={{ fontSize: '12px', color: '#9B9690', margin: 0 }}>
-          Swipe to navigate
-        </p>
-
         <button
           onClick={goToNextVerse}
-          style={{
-            width: '44px', height: '44px',
-            borderRadius: '50%',
-            border: '1.5px solid #E8DDD0',
-            background: '#FFFFFF',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer',
-          }}
+          className="w-8 h-8 flex items-center justify-center transition-colors duration-150 text-[#C9C5C0] hover:text-[#78716C]"
+          style={{ background: 'none', border: 'none', cursor: 'pointer' }}
         >
-          <ChevronRight size={20} color="#1C1917" />
+          <ChevronRight size={32} strokeWidth={1.5} />
         </button>
       </div>
 
-      {/* Audio bar */}
+      {/* ── Audio bar ────────────────────────────────────────── */}
       <div
+        className="flex items-center gap-4 px-6"
         style={{
-          background: '#FFFFFF',
-          borderTop: '1px solid #E8DDD0',
-          padding: '12px 20px 28px',
-          paddingBottom: 'max(28px, env(safe-area-inset-bottom, 28px))',
+          background: 'rgba(255,255,255,0.92)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderTop: '1px solid #F0EDE8',
+          paddingTop: '16px',
+          paddingBottom: 'max(32px, env(safe-area-inset-bottom, 32px))',
+          marginTop: '8px',
         }}
       >
-        {/* Seek slider */}
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={audioProgress}
-          onChange={(e) => {
-            const pct = parseInt(e.target.value)
-            setAudioProgress(pct)
-            if (audioRef.current && audioRef.current.duration) {
-              audioRef.current.currentTime = (pct / 100) * audioRef.current.duration
-            }
-          }}
-          style={{
-            width: '100%',
-            height: '3px',
-            appearance: 'none',
-            background: `linear-gradient(to right, #5C8B61 ${audioProgress}%, #E8DDD0 ${audioProgress}%)`,
-            borderRadius: '100px',
-            outline: 'none',
-            marginBottom: '12px',
-            cursor: 'pointer',
-          }}
-        />
-
-        {/* Controls */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
+        {/* Bookmark */}
+        <button
+          onClick={() => setIsBookmarked((b) => !b)}
+          className="flex items-center justify-center"
+          style={{ background: 'none', border: 'none', cursor: 'pointer' }}
         >
-          {/* Bookmark */}
-          <button
-            onClick={() => setIsBookmarked((b) => !b)}
-            style={{
-              width: '40px', height: '40px',
-              borderRadius: '50%',
-              border: 'none',
-              background: 'transparent',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <Bookmark
-              size={20}
-              color={isBookmarked ? '#5C8B61' : '#6B6560'}
-              fill={isBookmarked ? '#5C8B61' : 'none'}
-              strokeWidth={1.8}
-            />
-          </button>
+          <Bookmark
+            size={20}
+            color={isBookmarked ? '#5C8B61' : '#A8A29E'}
+            fill={isBookmarked ? '#5C8B61' : 'none'}
+            strokeWidth={1.8}
+          />
+        </button>
 
-          {/* Prev */}
+        {/* Center group */}
+        <div className="flex items-center gap-4 flex-1 justify-center">
           <button
             onClick={goToPrevVerse}
-            style={{
-              width: '40px', height: '40px',
-              borderRadius: '50%',
-              border: 'none',
-              background: 'transparent',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
+            className="transition-colors duration-150 text-[#78716C] hover:text-[#1C1917]"
+            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
           >
-            <SkipBack size={20} color="#1C1917" strokeWidth={1.8} />
+            <ChevronLeft size={18} strokeWidth={2} />
           </button>
 
           {/* Play/Pause */}
           <button
             onClick={togglePlay}
-            style={{
-              width: '52px', height: '52px',
-              borderRadius: '50%',
-              border: 'none',
-              background: '#5C8B61',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(92,139,97,0.3)',
-            }}
+            className="w-11 h-11 rounded-full flex items-center justify-center"
+            style={{ background: '#1C1917', border: 'none', cursor: 'pointer' }}
           >
             {isPlaying
-              ? <Pause size={22} color="#FFFFFF" fill="#FFFFFF" />
-              : <Play size={22} color="#FFFFFF" fill="#FFFFFF" />
+              ? <Pause size={18} color="#FFFFFF" fill="#FFFFFF" />
+              : <Play size={18} color="#FFFFFF" fill="#FFFFFF" style={{ marginLeft: '2px' }} />
             }
           </button>
 
-          {/* Next */}
           <button
             onClick={goToNextVerse}
-            style={{
-              width: '40px', height: '40px',
-              borderRadius: '50%',
-              border: 'none',
-              background: 'transparent',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
+            className="transition-colors duration-150 text-[#78716C] hover:text-[#1C1917]"
+            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
           >
-            <SkipForward size={20} color="#1C1917" strokeWidth={1.8} />
-          </button>
-
-          {/* Speed */}
-          <button
-            onClick={cycleSpeed}
-            style={{
-              height: '40px',
-              padding: '0 12px',
-              borderRadius: '100px',
-              border: '1.5px solid #E8DDD0',
-              background: '#FFFFFF',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 600,
-              color: '#1C1917',
-              fontFamily: 'var(--font-sans)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            {prefs.playback_speed}x
+            <ChevronRight size={18} strokeWidth={2} />
           </button>
         </div>
+
+        {/* Speed pill */}
+        <button
+          onClick={cycleSpeed}
+          className="rounded-full px-2.5 py-1"
+          style={{ fontSize: '12px', fontWeight: 600, color: '#78716C', background: '#F0EDE8', border: 'none', cursor: 'pointer', fontFamily: "'Geist', sans-serif" }}
+        >
+          {prefs.playback_speed}x
+        </button>
       </div>
 
-      {/* Backdrop for settings */}
+      {/* ── Settings backdrop + sheet ────────────────────────── */}
       <AnimatePresence>
         {showSettings && (
           <>
@@ -776,11 +596,8 @@ export default function Reader() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowSettings(false)}
-              style={{
-                position: 'fixed', inset: 0,
-                background: 'rgba(0,0,0,0.3)',
-                zIndex: 79,
-              }}
+              className="fixed inset-0"
+              style={{ background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(2px)', zIndex: 79 }}
             />
             <SettingsSheet
               prefs={prefs}
@@ -791,7 +608,7 @@ export default function Reader() {
         )}
       </AnimatePresence>
 
-      {/* Session complete */}
+      {/* ── Session complete ─────────────────────────────────── */}
       <AnimatePresence>
         {showComplete && (
           <SessionComplete
